@@ -7,21 +7,23 @@ extern crate lazy_static;
 extern crate log;
 
 mod de;
-mod ser;
 mod error;
+mod ser;
 
-pub use ser::{to_string, to_events, Serializer};
-pub use de::{from_str, from_string, from_events, Deserializer};
+pub use de::{from_events, from_str, from_string, Deserializer};
 pub use error::{Error, Result};
+pub use ser::{to_events, to_string, Serializer};
 
 lazy_static! {
     static ref NAME_RE: regex::Regex = {
-        regex::Regex::new(r"^(?:\{(?P<n>[^;]+)(?:;(?P<l>.+))?\})?(?:(?P<p>.+):)?(?P<e>.+)$").unwrap()
+        regex::Regex::new(r"^(?:\{(?P<n>[^;]+)(?:;(?P<l>.+))?\})?(?:(?P<p>.+):)?(?P<e>.+)$")
+            .unwrap()
     };
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[derive(Debug, Serialize, Deserialize)]
     pub enum EPPMessageType {
@@ -41,12 +43,14 @@ mod tests {
         pub message: EPPMessageType,
     }
 
-
     #[derive(Debug, Serialize)]
     pub struct EPPCommand {
         #[serde(rename = "$valueRaw")]
         pub command: String,
-        #[serde(rename = "{urn:ietf:params:xml:ns:epp-1.0}clTRID", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            rename = "{urn:ietf:params:xml:ns:epp-1.0}clTRID",
+            skip_serializing_if = "Option::is_none"
+        )]
         pub client_transaction_id: Option<String>,
     }
 
@@ -62,7 +66,10 @@ mod tests {
         pub client_id: String,
         #[serde(rename = "{urn:ietf:params:xml:ns:epp-1.0}pw")]
         pub password: String,
-        #[serde(rename = "$attr:{http://www.w3.org/2001/XMLSchema-instance}newPW", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            rename = "$attr:{http://www.w3.org/2001/XMLSchema-instance}newPW",
+            skip_serializing_if = "Option::is_none"
+        )]
         pub new_password: Option<String>,
         pub options: EPPLoginOptions,
         #[serde(rename = "{urn:ietf:params:xml:ns:epp-1.0}svcs")]
@@ -82,15 +89,18 @@ mod tests {
         pub objects: Vec<String>,
     }
 
-
     #[test]
     fn encode() {
         pretty_env_logger::init();
-        println!("{:?}", super::ser::to_string(&EPPMessage {
+
+        let message = EPPMessage {
             message: EPPMessageType::Command(EPPCommand {
                 command: "&".to_string(),
                 client_transaction_id: Some("&".to_string()),
-            })
-        }).unwrap());
+            }),
+        };
+
+        let encoded = ser::to_string(&message).expect("Encode to XML");
+        println!("{:?}", encoded);
     }
 }
