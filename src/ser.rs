@@ -215,7 +215,7 @@ fn format_data<W: EventWriter>(
         }
         _SerializerData::Seq(s) => {
             for d in s {
-                format_data(writer, &d, state)?;
+                format_data(writer, d, state)?;
             }
         }
         _SerializerData::Struct { contents, .. } => {
@@ -223,10 +223,10 @@ fn format_data<W: EventWriter>(
                 if tag == "$valueRaw" {
                     let old_val = state.raw_output;
                     state.raw_output = true;
-                    format_data(writer, &d, state)?;
+                    format_data(writer, d, state)?;
                     state.raw_output = old_val;
                 } else if tag.starts_with(&"$value") {
-                    format_data(writer, &d, state)?;
+                    format_data(writer, d, state)?;
                 } else {
                     let caps = crate::NAME_RE.captures(tag).unwrap();
                     let base_name = caps.name("e").unwrap().as_str();
@@ -296,7 +296,7 @@ fn format_data<W: EventWriter>(
                                 }
 
                                 writer.write(elm)?;
-                                format_data(writer, &d, state)?;
+                                format_data(writer, d, state)?;
                                 writer.write(xml::writer::XmlEvent::end_element())?;
                                 if should_pop {
                                     state.ns_stack.pop();
@@ -362,7 +362,7 @@ fn format_data<W: EventWriter>(
                             }
 
                             writer.write(elm)?;
-                            format_data(writer, &d, state)?;
+                            format_data(writer, d, state)?;
                             writer.write(xml::writer::XmlEvent::end_element())?;
                             if should_pop {
                                 state.ns_stack.pop();
@@ -693,11 +693,13 @@ impl<'a> ser::SerializeStruct for StructSerializer<'a> {
         T: ?Sized + Serialize,
     {
         let val = value.serialize(&mut *self.parent)?;
-        if key.starts_with("$attr:") {
-            self.attrs.push((key[6..].to_string(), val.as_str()));
+
+        if let Some(attr) = key.strip_prefix("$attr:") {
+            self.attrs.push((attr.to_string(), val.as_str()));
         } else {
             self.keys.push((key.to_string(), val));
         }
+
         Ok(())
     }
 
@@ -725,11 +727,13 @@ impl<'a> ser::SerializeStructVariant for StructVariantSerializer<'a> {
         T: ?Sized + Serialize,
     {
         let val = value.serialize(&mut *self.parent)?;
-        if key.starts_with("$attr:") {
-            self.attrs.push((key[6..].to_string(), val.as_str()));
+
+        if let Some(attr) = key.strip_prefix("$attr:") {
+            self.attrs.push((attr.to_string(), val.as_str()));
         } else {
             self.keys.push((key.to_string(), val));
         }
+
         Ok(())
     }
 

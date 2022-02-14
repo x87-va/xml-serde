@@ -25,12 +25,12 @@ pub fn from_string<'a, T: Deserialize<'a>>(input: String) -> crate::Result<T> {
 }
 
 fn from_bytes<'a, T: Deserialize<'a>>(input: &[u8]) -> crate::Result<T> {
-    let conf = xml::ParserConfig::new()
+    let config = xml::ParserConfig::new()
         .trim_whitespace(true)
         .whitespace_to_characters(true)
         .replace_unknown_entity_references(true);
 
-    let mut event_reader = xml::reader::EventReader::new_with_config(input, conf);
+    let mut event_reader = xml::reader::EventReader::new_with_config(input, config);
 
     match event_reader.next()? {
         xml::reader::XmlEvent::StartDocument {
@@ -96,9 +96,7 @@ pub fn from_events<'a, T: Deserialize<'a>>(
         reset_peek_offset: 0,
     };
 
-    let t = T::deserialize(&mut deserializer)?;
-
-    Ok(t)
+    T::deserialize(&mut deserializer)
 }
 
 impl<I: Iterator<Item = XmlRes>> Deserializer<I> {
@@ -235,10 +233,10 @@ impl<I: Iterator<Item = XmlRes>> Deserializer<I> {
     fn parse_string(&mut self) -> crate::Result<String> {
         trace!("prase_string()");
         self.read_inner_value(|this| {
-            match this.peek()? {
-                xml::reader::XmlEvent::EndElement { .. } => return Ok(String::new()),
-                _ => {}
+            if let xml::reader::XmlEvent::EndElement { .. } = this.peek()? {
+                return Ok(String::new());
             }
+
             match this.next()? {
                 xml::reader::XmlEvent::CData(s) | xml::reader::XmlEvent::Characters(s) => Ok(s),
                 xml::reader::XmlEvent::StartElement {
@@ -450,12 +448,9 @@ impl<'de, 'a, I: Iterator<Item = XmlRes>> de::Deserializer<'de> for &'a mut Dese
         visitor.visit_newtype_struct(self)
     }
 
-    fn deserialize_seq<V: serde::de::Visitor<'de>>(
-        mut self,
-        visitor: V,
-    ) -> crate::Result<V::Value> {
+    fn deserialize_seq<V: serde::de::Visitor<'de>>(self, visitor: V) -> crate::Result<V::Value> {
         trace!("deserialize_seq()");
-        visitor.visit_seq(Seq::new(&mut self)?)
+        visitor.visit_seq(Seq::new(self)?)
     }
 
     fn deserialize_tuple<V: serde::de::Visitor<'de>>(
@@ -620,15 +615,18 @@ struct Field {
 impl From<&&str> for Field {
     fn from(from: &&str) -> Self {
         let mut attr = false;
-        let from = if from.starts_with("$attr:") {
+
+        let from = if let Some(stripped) = from.strip_prefix("$attr:") {
             attr = true;
-            &from[6..]
+            stripped
         } else {
             from
         };
+
         let caps = crate::NAME_RE.captures(from).unwrap();
         let base_name = caps.name("e").unwrap().as_str().to_string();
         let namespace = caps.name("n").map(|n| n.as_str().to_string());
+
         Field {
             namespace,
             local_name: base_name,
@@ -644,7 +642,7 @@ impl From<&[&str]> for Fields {
         Fields {
             fields: from.iter().map(|f| f.into()).collect(),
             inner_value: num_value >= 1,
-            num_value: num_value,
+            num_value,
             value_used: 0,
         }
     }
@@ -689,10 +687,12 @@ impl Fields {
                 return name_str;
             }
         }
+
         let name_str = match &name.namespace {
             Some(n) => format!("{{{}}}{}", n, name.local_name),
             None => name.local_name.clone(),
         };
+
         let name_str = format!("$attr:{}", name_str);
         trace!("match_attr({:?}) -> {:?}", name, name_str);
         name_str
