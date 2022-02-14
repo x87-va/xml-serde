@@ -63,7 +63,12 @@ fn from_bytes<'a, T: Deserialize<'a>>(input: &[u8]) -> crate::Result<T> {
 pub fn from_events<'a, T: Deserialize<'a>>(
     events: &[xml::reader::Result<xml::reader::XmlEvent>],
 ) -> crate::Result<T> {
-    let mut reader = itertools::multipeek(events.into_iter().map(|r| r.to_owned()));
+    let filtered_events = events
+        .iter()
+        .filter(|event| !matches!(event, Ok(xml::reader::XmlEvent::Whitespace(_))))
+        .map(|event| event.to_owned());
+
+    let mut reader = itertools::multipeek(filtered_events);
 
     if let Ok(xml::reader::XmlEvent::StartDocument { .. }) =
         reader.peek().ok_or(crate::Error::ExpectedElement)?
