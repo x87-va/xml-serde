@@ -16,6 +16,25 @@ pub struct Deserializer<I: Iterator<Item = XmlRes>> {
     reset_peek_offset: u64,
 }
 
+fn new_reader<I: IntoIterator<Item = XmlRes>>(
+    iter: I,
+) -> itertools::MultiPeek<impl Iterator<Item = XmlRes>> {
+    itertools::multipeek(iter.into_iter().filter(|event| match event {
+        Ok(xml::reader::XmlEvent::ProcessingInstruction { .. }) => {
+            trace!(
+                "discarding processing instruction: {:?}",
+                event.as_ref().unwrap()
+            );
+            false
+        }
+        Ok(xml::reader::XmlEvent::Whitespace { .. }) => {
+            trace!("discarding whitespace");
+            false
+        }
+        _ => true,
+    }))
+}
+
 pub fn from_str<'a, T: Deserialize<'a>>(input: &'a str) -> crate::Result<T> {
     from_bytes(input.as_bytes())
 }
@@ -49,7 +68,7 @@ fn from_bytes<'a, T: Deserialize<'a>>(input: &[u8]) -> crate::Result<T> {
     }
 
     let mut deserializer = Deserializer {
-        reader: itertools::multipeek(Box::new(event_reader.into_iter())),
+        reader: new_reader(event_reader),
         depth: 0,
         is_map_value: false,
         is_greedy: true,
@@ -63,12 +82,7 @@ fn from_bytes<'a, T: Deserialize<'a>>(input: &[u8]) -> crate::Result<T> {
 pub fn from_events<'a, T: Deserialize<'a>>(
     events: &[xml::reader::Result<xml::reader::XmlEvent>],
 ) -> crate::Result<T> {
-    let filtered_events = events
-        .iter()
-        .filter(|event| !matches!(event, Ok(xml::reader::XmlEvent::Whitespace(_))))
-        .map(|event| event.to_owned());
-
-    let mut reader = itertools::multipeek(filtered_events);
+    let mut reader = new_reader(events.iter().map(|r| r.to_owned()));
 
     if let Ok(xml::reader::XmlEvent::StartDocument { .. }) =
         reader.peek().ok_or(crate::Error::ExpectedElement)?
@@ -941,5 +955,77 @@ impl<'de> serde::de::Deserializer<'de> for AttrValueDeserializer {
     serde::forward_to_deserialize_any! {
         char str string unit seq bytes map unit_struct newtype_struct tuple_struct
         struct identifier tuple ignored_any byte_buf
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn deserialize_element_into_struct() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct Foo {
+            #[serde(rename = "{urn:foo}foo:bar")]
+            bar: String,
+        }
+
+        assert_eq!(
+            crate::from_str::<Foo>(
+                r#"
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<foo:bar xmlns:foo="urn:foo">baz</foo:bar>
+            "#
+            )
+            .unwrap(),
+            Foo {
+                bar: "baz".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn deserialize_element_with_whitespaces_into_struct() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct Foo {
+            #[serde(rename = "{urn:foo}foo:bar")]
+            bar: String,
+        }
+
+        assert_eq!(
+            crate::from_str::<Foo>(
+                r#"
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<foo:bar xmlns:foo="urn:foo">
+    baz
+</foo:bar>
+            "#
+            )
+            .unwrap(),
+            Foo {
+                bar: "baz".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn deserialize_element_with_processing_instruction_into_struct() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct Foo {
+            #[serde(rename = "{urn:foo}foo:bar")]
+            bar: String,
+        }
+
+        assert_eq!(
+            crate::from_str::<Foo>(
+                r#"
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<?xml-stylesheet href='foo.xsl' type='text/xsl'?>
+<foo:bar xmlns:foo="urn:foo">baz</foo:bar>
+            "#
+            )
+            .unwrap(),
+            Foo {
+                bar: "baz".to_string()
+            }
+        );
     }
 }
