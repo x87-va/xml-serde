@@ -33,8 +33,7 @@ impl EventWriter for ListWriter {
         &mut self,
         event: E,
     ) -> xml::writer::Result<()> {
-        let e = event.into();
-        let re = match e {
+        let re = match event.into() {
             xml::writer::XmlEvent::StartDocument {
                 version,
                 encoding,
@@ -62,13 +61,14 @@ impl EventWriter for ListWriter {
             xml::writer::XmlEvent::EndElement { name } => xml::reader::XmlEvent::EndElement {
                 name: match name {
                     Some(n) => n.to_owned(),
-                    None => unreachable!(),
+                    None => panic!("EndElement has no name"),
                 },
             },
             xml::writer::XmlEvent::CData(s) => xml::reader::XmlEvent::CData(s.into()),
             xml::writer::XmlEvent::Characters(s) => xml::reader::XmlEvent::Characters(s.into()),
             xml::writer::XmlEvent::Comment(s) => xml::reader::XmlEvent::Comment(s.into()),
         };
+
         self.0.push(re);
         Ok(())
     }
@@ -297,7 +297,8 @@ fn format_data<W: EventWriter>(
 
                                 writer.write(elm)?;
                                 format_data(writer, d, state)?;
-                                writer.write(xml::writer::XmlEvent::end_element())?;
+                                writer.write(xml::writer::XmlEvent::end_element().name(name.as_str()))?;
+
                                 if should_pop {
                                     state.ns_stack.pop();
                                 }
@@ -328,6 +329,7 @@ fn format_data<W: EventWriter>(
                             if state.include_schema_location {
                                 elm = elm.ns("xsi", "http://www.w3.org/2001/XMLSchema-instance");
                             }
+
                             let mut loc = String::new();
                             let mut should_pop = false;
                             if let Some(n) = caps.name("n") {
@@ -363,7 +365,8 @@ fn format_data<W: EventWriter>(
 
                             writer.write(elm)?;
                             format_data(writer, d, state)?;
-                            writer.write(xml::writer::XmlEvent::end_element())?;
+                            writer.write(xml::writer::XmlEvent::end_element().name(name.as_str()))?;
+
                             if should_pop {
                                 state.ns_stack.pop();
                             }
