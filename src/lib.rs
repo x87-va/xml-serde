@@ -10,14 +10,14 @@ mod de;
 mod error;
 mod ser;
 
-pub use de::{from_events, from_str, from_string, Deserializer};
+pub use ser::{to_string, to_string_custom, to_events, to_events_custom, Serializer, Options};
+pub use de::{from_str, from_string, from_events, Deserializer};
 pub use error::{Error, Result};
 pub use ser::{to_events, to_string, Serializer};
 
 lazy_static! {
     static ref NAME_RE: regex::Regex = {
-        regex::Regex::new(r"^(?:\{(?P<n>[^;]+)(?:;(?P<l>.+))?\})?(?:(?P<p>.+):)?(?P<e>.+)$")
-            .unwrap()
+        regex::Regex::new(r"^(?:\{(?P<n>[^;]+)(?:;(?P<l>.*))?\})?(?:(?P<p>.+):)?(?P<e>.+)$").unwrap()
     };
 }
 

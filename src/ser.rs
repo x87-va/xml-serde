@@ -272,20 +272,19 @@ fn format_data<W: EventWriter>(
                                     };
                                     if !state.ns_stack.iter().any(|ns| ns == n) {
                                         if let Some(l) = caps.name("l") {
-                                            loc.push_str(&format!("{} {}", n, l.as_str()));
+                                            if !l.as_str().is_empty() {
+                                                loc.push_str(&format!("{} {}", n, l.as_str()));
+                                            }
                                         } else {
                                             let last_n = n.rsplit(':').next().unwrap();
                                             loc.push_str(&format!("{} {}.xsd", n, last_n));
                                         }
-                                        if state.include_schema_location {
-                                            elm = elm.attr(
-                                                xml::name::Name {
-                                                    namespace: None,
-                                                    local_name: "schemaLocation",
-                                                    prefix: Some("xsi"),
-                                                },
-                                                &loc,
-                                            );
+                                        if state.include_schema_location && !loc.is_empty() {
+                                            elm = elm.attr(xml::name::Name {
+                                                namespace: None,
+                                                local_name: "schemaLocation",
+                                                prefix: Some("xsi"),
+                                            }, &loc);
                                         }
                                         state.ns_stack.push(n.to_string());
                                         should_pop = true;
@@ -340,20 +339,19 @@ fn format_data<W: EventWriter>(
                                 };
                                 if !state.ns_stack.iter().any(|ns| ns == n) {
                                     if let Some(l) = caps.name("l") {
-                                        loc.push_str(&format!("{} {}", n, l.as_str()));
+                                        if !l.as_str().is_empty() {
+                                            loc.push_str(&format!("{} {}", n, l.as_str()));
+                                        }
                                     } else {
                                         let last_n = n.rsplit(':').next().unwrap();
                                         loc.push_str(&format!("{} {}.xsd", n, last_n));
                                     }
-                                    if state.include_schema_location {
-                                        elm = elm.attr(
-                                            xml::name::Name {
-                                                namespace: None,
-                                                local_name: "schemaLocation",
-                                                prefix: Some("xsi"),
-                                            },
-                                            &loc,
-                                        );
+                                    if state.include_schema_location && !loc.is_empty() {
+                                        elm = elm.attr(xml::name::Name {
+                                            namespace: None,
+                                            local_name: "schemaLocation",
+                                            prefix: Some("xsi"),
+                                        }, &loc);
                                     }
                                     state.ns_stack.push(n.to_string());
                                     should_pop = true;
