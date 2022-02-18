@@ -78,7 +78,12 @@ fn from_bytes<'a, T: Deserialize<'a>>(input: &[u8]) -> crate::Result<T> {
 pub fn from_events<'a, T: Deserialize<'a>>(
     events: &[xml::reader::Result<xml::reader::XmlEvent>],
 ) -> crate::Result<T> {
-    let mut reader = new_reader(events.iter().map(|r| r.to_owned()));
+    let mut reader = new_reader(
+        events
+            .iter()
+            .filter(|event| !matches!(event, Ok(xml::reader::XmlEvent::Whitespace(_))))
+            .map(|event| event.to_owned()),
+    );
 
     if let Ok(xml::reader::XmlEvent::StartDocument { .. }) =
         reader.peek().ok_or(crate::Error::ExpectedElement)?
@@ -979,30 +984,46 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_element_with_whitespaces_into_struct() {
+    fn deserialize_element_from_events_with_whitespaces() {
         #[derive(Debug, PartialEq, Deserialize)]
         struct Foo {
             #[serde(rename = "{urn:foo}foo:bar")]
-            bar: String,
+            bar: Bar,
         }
 
-        assert_eq!(
-            crate::from_str::<Foo>(
-                r#"
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct Bar {
+            #[serde(rename = "{urn:foo}foo:baz")]
+            baz: String,
+        }
+
+        let input = r#"
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <foo:bar xmlns:foo="urn:foo">
-    baz
-</foo:bar>
-            "#
-            )
-            .unwrap(),
-            Foo {
-                bar: "baz".to_string()
-            }
-        );
-    }
+    <foo:baz xmlns:foo="urn:foo">baz</foo:baz>
+</foo:bar>"#;
 
-    #[test]
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let events = xml::reader::EventReader::new_with_config(input.as_bytes(), parser_config)
+            .into_iter()
+            .map(|event| xml::reader::Result::Ok(event.to_owned()))
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        let result = crate::from_events::<Foo>(&events).unwrap();
+
+        let expected = Foo {
+            bar: Bar {
+                baz: "baz".to_string(),
+            },
+        };
+
+        assert_eq!(result, expected);
+    }
     fn deserialize_element_with_processing_instruction_into_struct() {
         #[derive(Debug, PartialEq, Deserialize)]
         struct Foo {
