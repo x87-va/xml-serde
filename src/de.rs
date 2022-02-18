@@ -27,10 +27,6 @@ fn new_reader<I: IntoIterator<Item = XmlRes>>(
             );
             false
         }
-        Ok(xml::reader::XmlEvent::Whitespace { .. }) => {
-            trace!("discarding whitespace");
-            false
-        }
         _ => true,
     }))
 }

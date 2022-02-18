@@ -280,11 +280,14 @@ fn format_data<W: EventWriter>(
                                             loc.push_str(&format!("{} {}.xsd", n, last_n));
                                         }
                                         if state.include_schema_location && !loc.is_empty() {
-                                            elm = elm.attr(xml::name::Name {
-                                                namespace: None,
-                                                local_name: "schemaLocation",
-                                                prefix: Some("xsi"),
-                                            }, &loc);
+                                            elm = elm.attr(
+                                                xml::name::Name {
+                                                    namespace: None,
+                                                    local_name: "schemaLocation",
+                                                    prefix: Some("xsi"),
+                                                },
+                                                &loc,
+                                            );
                                         }
                                         state.ns_stack.push(n.to_string());
                                         should_pop = true;
@@ -296,7 +299,9 @@ fn format_data<W: EventWriter>(
 
                                 writer.write(elm)?;
                                 format_data(writer, d, state)?;
-                                writer.write(xml::writer::XmlEvent::end_element().name(name.as_str()))?;
+                                writer.write(
+                                    xml::writer::XmlEvent::end_element().name(name.as_str()),
+                                )?;
 
                                 if should_pop {
                                     state.ns_stack.pop();
@@ -347,11 +352,14 @@ fn format_data<W: EventWriter>(
                                         loc.push_str(&format!("{} {}.xsd", n, last_n));
                                     }
                                     if state.include_schema_location && !loc.is_empty() {
-                                        elm = elm.attr(xml::name::Name {
-                                            namespace: None,
-                                            local_name: "schemaLocation",
-                                            prefix: Some("xsi"),
-                                        }, &loc);
+                                        elm = elm.attr(
+                                            xml::name::Name {
+                                                namespace: None,
+                                                local_name: "schemaLocation",
+                                                prefix: Some("xsi"),
+                                            },
+                                            &loc,
+                                        );
                                     }
                                     state.ns_stack.push(n.to_string());
                                     should_pop = true;
@@ -363,7 +371,8 @@ fn format_data<W: EventWriter>(
 
                             writer.write(elm)?;
                             format_data(writer, d, state)?;
-                            writer.write(xml::writer::XmlEvent::end_element().name(name.as_str()))?;
+                            writer
+                                .write(xml::writer::XmlEvent::end_element().name(name.as_str()))?;
 
                             if should_pop {
                                 state.ns_stack.pop();
