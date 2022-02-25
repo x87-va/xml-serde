@@ -2,24 +2,19 @@
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
+extern crate core;
 
 mod de;
 mod error;
 mod ser;
+mod tag;
+
+pub(crate) use tag::Tag;
 
 pub use de::{from_events, from_str, from_string, Deserializer};
 pub use error::{Error, Result};
 pub use ser::{to_events, to_events_custom, to_string, to_string_custom, Options, Serializer};
-
-lazy_static! {
-    static ref NAME_RE: regex::Regex = {
-        regex::Regex::new(r"^(?:\{(?P<n>[^;]+)(?:;(?P<l>.*))?\})?(?:(?P<p>.+):)?(?P<e>.+)$")
-            .unwrap()
-    };
-}
 
 #[cfg(test)]
 mod tests {
